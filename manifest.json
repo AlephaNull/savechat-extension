@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "SaveChat",
+  "version": "1.0.0",
+  "description": "Save ChatGPT responses for later reference with enhanced features",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SaveChat - View Saved Responses"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+} 

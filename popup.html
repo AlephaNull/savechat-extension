@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaveChat - Recent Saved Response</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <span class="icon">💾</span>
+        <h1>SaveChat</h1>
+      </div>
+      <div class="stats">
+        <span id="total-saved">0</span> saved
+      </div>
+    </header>
+
+    <main class="content">
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading recent response...</p>
+      </div>
+
+      <div id="no-responses" class="no-responses" style="display: none;">
+        <div class="empty-state">
+          <span class="icon">📝</span>
+          <h3>No saved responses yet</h3>
+          <p>Start saving ChatGPT responses to see them here!</p>
+        </div>
+      </div>
+
+      <div id="recent-response" class="recent-response" style="display: none;">
+        <div class="response-header">
+          <h3>Most Recent Response</h3>
+          <span class="timestamp" id="response-timestamp"></span>
+        </div>
+        
+        <div class="response-content">
+          <div class="context" id="response-context"></div>
+          <div class="text" id="response-text"></div>
+        </div>
+
+        <div class="response-actions">
+          <button id="copy-btn" class="action-btn">
+            <span class="icon">📋</span>
+            Copy
+          </button>
+          <button id="view-all-btn" class="action-btn primary">
+            <span class="icon">📚</span>
+            View All
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <button id="open-webapp" class="webapp-btn">
+        <span class="icon">🌐</span>
+        Open Web App
+      </button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html> 

@@ -1,0 +1,76 @@
+/* SaveChat Extension Styles */
+
+.savechat-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.savechat-button:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.savechat-button.saved {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.savechat-button.saved:hover {
+  background: #059669;
+  border-color: #059669;
+}
+
+.savechat-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.savechat-button .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Dark mode support for ChatGPT */
+.dark .savechat-button {
+  background: #374151;
+  color: #f9fafb;
+  border-color: #4b5563;
+}
+
+.dark .savechat-button:hover {
+  background: #4b5563;
+  border-color: #6b7280;
+}
+
+.dark .savechat-button.saved {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+/* Animation for save confirmation */
+@keyframes savePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.savechat-button.saved {
+  animation: savePulse 0.3s ease;
+} 
