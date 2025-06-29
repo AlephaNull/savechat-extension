@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SaveChat",
   "version": "1.0.0",
-  "description": "Save ChatGPT responses for later reference with enhanced features",
+  "description": "Save ChatGPT responses for later reference with enhanced featuresNever lose a great ChatGPT response again. SaveChat helps you save, organize, and revisit your favorite ChatGPT responses with one click. ",
   "permissions": [
     "storage",
     "scripting",
