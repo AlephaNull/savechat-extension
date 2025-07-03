@@ -10,23 +10,23 @@ class SaveChatContent {
   }
 
   init() {
-    console.log('SaveChat: Initializing content script...');
-    
+    console.log('SaveChat:Initializing content script...');
+
     // Debug: Log current page structure
     this.debugPageStructure();
-    
+
     // Start observing for new responses
     this.startObserver();
-    
+
     // Add save buttons to existing responses
     this.addSaveButtonsToExistingResponses();
-    
+
     // Retry after a delay in case content loads dynamically
     setTimeout(() => {
-      console.log('SaveChat: Retrying to find responses after delay...');
+      console.log('SaveChat:Retrying to find responses after delay...');
       this.addSaveButtonsToExistingResponses();
     }, 2000);
-    
+
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === 'getRecentSaved') {
@@ -34,7 +34,7 @@ class SaveChatContent {
         return true; // Keep message channel open for async response
       }
     });
-    
+
     // Monitor for navigation changes (ChatGPT is a SPA)
     this.monitorNavigation();
   }
@@ -43,12 +43,12 @@ class SaveChatContent {
     // Watch for URL changes (ChatGPT navigation)
     let lastUrl = window.location.href;
     let lastConversationId = this.getConversationId();
-    
+
     // Check for URL changes periodically
     setInterval(() => {
       const currentUrl = window.location.href;
       const currentConversationId = this.getConversationId();
-      
+
       if (currentUrl !== lastUrl || currentConversationId !== lastConversationId) {
         console.log('SaveChat: Navigation detected, URL changed from', lastUrl, 'to', currentUrl);
         console.log('SaveChat: Conversation ID changed from', lastConversationId, 'to', currentConversationId);
@@ -57,29 +57,29 @@ class SaveChatContent {
         this.handleNavigation();
       }
     }, 1000);
-    
+
     // Also listen for popstate events (back/forward buttons)
     window.addEventListener('popstate', () => {
       console.log('SaveChat: Popstate event detected');
       setTimeout(() => this.handleNavigation(), 100);
     });
-    
+
     // Listen for pushstate/replacestate (programmatic navigation)
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
-    
-    history.pushState = function(...args) {
+
+    history.pushState = function (...args) {
       originalPushState.apply(history, args);
       console.log('SaveChat: PushState detected');
       setTimeout(() => this.handleNavigation(), 100);
     }.bind(this);
-    
-    history.replaceState = function(...args) {
+
+    history.replaceState = function (...args) {
       originalReplaceState.apply(history, args);
       console.log('SaveChat: ReplaceState detected');
       setTimeout(() => this.handleNavigation(), 100);
     }.bind(this);
-    
+
     // Listen for clicks on conversation items in sidebar
     this.monitorSidebarClicks();
   }
@@ -104,41 +104,41 @@ class SaveChatContent {
     if (urlMatch) {
       return urlMatch[1];
     }
-    
+
     // Fallback: try to get from page elements
     const titleElement = document.querySelector('h1, .text-lg, [data-testid="conversation-title"]');
     if (titleElement) {
       return titleElement.textContent.trim();
     }
-    
+
     // Last fallback: use URL as conversation identifier
     return url;
   }
 
   handleNavigation() {
     console.log('SaveChat: Handling navigation change...');
-    
+
     // Stop the current observer
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
     }
-    
+
     // Clear saved responses set for new conversation
     this.savedResponses.clear();
-    
+
     // Wait a bit for the new content to load, then re-initialize
     setTimeout(() => {
       console.log('SaveChat: Re-initializing after navigation...');
       this.startObserver();
       this.addSaveButtonsToExistingResponses();
-      
+
       // Additional retry after navigation
       setTimeout(() => {
         console.log('SaveChat: Final retry after navigation...');
         this.addSaveButtonsToExistingResponses();
       }, 2000);
-      
+
       // Keep trying for a while in case content loads very slowly
       let retryCount = 0;
       const maxRetries = 10;
@@ -146,7 +146,7 @@ class SaveChatContent {
         retryCount++;
         console.log(`SaveChat: Retry ${retryCount}/${maxRetries} after navigation...`);
         this.addSaveButtonsToExistingResponses();
-        
+
         if (retryCount >= maxRetries) {
           clearInterval(retryInterval);
           console.log('SaveChat: Stopped retrying after navigation');
@@ -157,7 +157,7 @@ class SaveChatContent {
 
   debugPageStructure() {
     console.log('SaveChat: Debugging page structure...');
-    
+
     // Check for common ChatGPT elements
     const elements = [
       { selector: '[data-message-author-role="assistant"]', name: 'Assistant messages' },
@@ -168,7 +168,7 @@ class SaveChatContent {
       { selector: '[role="main"]', name: 'Main role element' },
       { selector: '.flex.flex-col.items-center', name: 'Flex container' }
     ];
-    
+
     elements.forEach(({ selector, name }) => {
       const found = document.querySelectorAll(selector);
       console.log(`SaveChat: ${name}: ${found.length} found`);
@@ -214,7 +214,7 @@ class SaveChatContent {
       '#__next',
       '.min-h-screen'
     ];
-    
+
     for (const selector of selectors) {
       const container = document.querySelector(selector);
       if (container) {
@@ -222,7 +222,7 @@ class SaveChatContent {
         return container;
       }
     }
-    
+
     console.log('SaveChat: No container found, using document.body');
     return document.body;
   }
@@ -240,15 +240,15 @@ class SaveChatContent {
         '.group.w-full.text-gray-800.dark\\:text-gray-100',
         '.flex.flex-col.items-center.text-base'
       ];
-      
+
       selectors.forEach(selector => {
         const responses = node.querySelectorAll(selector);
         if (responses.length > 0) {
           console.log(`SaveChat: Found ${responses.length} response(s) in added node with selector: ${selector}`);
           responses.forEach(response => {
             // Only add to assistant responses, not user messages
-            if (response.getAttribute('data-message-author-role') === 'assistant' || 
-                !response.getAttribute('data-message-author-role')) {
+            if (response.getAttribute('data-message-author-role') === 'assistant' ||
+              !response.getAttribute('data-message-author-role')) {
               this.addSaveButton(response);
             }
           });
@@ -264,13 +264,13 @@ class SaveChatContent {
       '.group.w-full.text-gray-800.dark\\:text-gray-100',
       '.flex.flex-col.items-center.text-base'
     ];
-    
+
     return node.matches && responseSelectors.some(selector => node.matches(selector));
   }
 
   addSaveButtonsToExistingResponses() {
     console.log('SaveChat: Looking for existing responses...');
-    
+
     // Try multiple selectors for ChatGPT responses
     const selectors = [
       'div[data-message-author-role="assistant"]',
@@ -280,21 +280,21 @@ class SaveChatContent {
       '.markdown',
       '.prose'
     ];
-    
+
     let totalResponses = 0;
     selectors.forEach(selector => {
       const responses = document.querySelectorAll(selector);
       console.log(`SaveChat: Found ${responses.length} responses with selector: ${selector}`);
       responses.forEach(response => {
         // Only add to assistant responses, not user messages
-        if (response.getAttribute('data-message-author-role') === 'assistant' || 
-            !response.getAttribute('data-message-author-role')) {
+        if (response.getAttribute('data-message-author-role') === 'assistant' ||
+          !response.getAttribute('data-message-author-role')) {
           this.addSaveButton(response);
           totalResponses++;
         }
       });
     });
-    
+
     console.log(`SaveChat: Total responses processed: ${totalResponses}`);
   }
 
@@ -325,12 +325,12 @@ class SaveChatContent {
     saveButton.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       await this.saveResponse(responseElement, saveButton);
     });
 
     buttonContainer.appendChild(saveButton);
-    
+
     // Find the best place to insert the button
     const insertTarget = this.findInsertTarget(responseElement);
     if (insertTarget) {
@@ -349,7 +349,7 @@ class SaveChatContent {
       '.whitespace-pre-wrap',
       '[data-message-author-role="assistant"] > div:last-child'
     ];
-    
+
     for (const selector of selectors) {
       const target = responseElement.querySelector(selector);
       if (target) {
@@ -357,7 +357,7 @@ class SaveChatContent {
         return target;
       }
     }
-    
+
     console.log('SaveChat: No specific target found, using response element itself');
     // Fallback to the response element itself
     return responseElement;
@@ -367,7 +367,7 @@ class SaveChatContent {
     try {
       // Disable button during save
       button.disabled = true;
-      
+
       // Extract response text
       const responseText = this.extractResponseText(responseElement);
       if (!responseText.trim()) {
@@ -376,7 +376,7 @@ class SaveChatContent {
 
       // Get conversation context
       const context = this.getConversationContext(responseElement);
-      
+
       // Create save data
       const saveData = {
         text: responseText,
@@ -388,15 +388,15 @@ class SaveChatContent {
 
       // Save to storage
       await this.saveToStorage(saveData);
-      
+
       // Update button state
       this.updateButtonState(button, true);
-      
+
       // Add to saved set
       this.savedResponses.add(responseElement);
-      
+
       console.log('SaveChat: Response saved successfully');
-      
+
     } catch (error) {
       console.error('SaveChat: Error saving response:', error);
       this.updateButtonState(button, false, 'Error');
@@ -409,7 +409,7 @@ class SaveChatContent {
     if (markdownElement) {
       return markdownElement.innerText || markdownElement.textContent;
     }
-    
+
     // Fallback to the entire response text
     return responseElement.innerText || responseElement.textContent;
   }
@@ -418,22 +418,22 @@ class SaveChatContent {
     // Get the conversation title or first few messages for context
     const titleElement = document.querySelector('h1, .text-lg, [data-testid="conversation-title"]');
     const title = titleElement ? titleElement.textContent.trim() : 'ChatGPT Conversation';
-    
+
     // Get a few messages before this response for context
     const messages = [];
     const messageElements = document.querySelectorAll('[data-message-author-role]');
-    
+
     for (let i = 0; i < messageElements.length; i++) {
       const element = messageElements[i];
       if (element === responseElement) break;
-      
+
       const role = element.getAttribute('data-message-author-role');
       const text = element.innerText || element.textContent;
       if (text.trim()) {
         messages.push({ role, text: text.substring(0, 100) + '...' });
       }
     }
-    
+
     return {
       title,
       messages: messages.slice(-3) // Last 3 messages for context
@@ -458,12 +458,12 @@ class SaveChatContent {
   updateButtonState(button, saved, errorText = null) {
     const iconSpan = button.querySelector('.icon');
     const textSpan = button.querySelector('.text');
-    
+
     if (saved) {
       button.classList.add('saved');
       iconSpan.textContent = '✅';
       textSpan.textContent = 'Saved!';
-      
+
       // Reset after 3 seconds
       setTimeout(() => {
         button.classList.remove('saved');
