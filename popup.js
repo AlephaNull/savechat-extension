@@ -148,9 +148,8 @@ class SaveChatPopup {
   }
 
   openWebApp() {
-    // For now, open a placeholder URL
-    // Later this will point to the actual web app
-    const webAppUrl = 'https://savechat.app'; // Placeholder
+    // Open the local HTML file that displays all saved responses
+    const webAppUrl = chrome.runtime.getURL('saved-responses.html');
     chrome.tabs.create({ url: webAppUrl });
   }
 

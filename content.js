@@ -10,33 +10,115 @@ class SaveChatContent {
   }
 
   init() {
-    console.log('SaveChat:Initializing content script...');
+    console.log('SaveChat: Initializing content script...');
 
-    // Debug: Log current page structure
-    this.debugPageStructure();
+    // Wait for ChatGPT's DOM to be ready before starting
+    this.waitForChatGPTReady().then(() => {
+      console.log('SaveChat: ChatGPT DOM is ready, starting initialization...');
+      
+      // Debug: Log current page structure
+      this.debugPageStructure();
 
-    // Start observing for new responses
-    this.startObserver();
+      // Start observing for new responses
+      this.startObserver();
 
-    // Add save buttons to existing responses
-    this.addSaveButtonsToExistingResponses();
-
-    // Retry after a delay in case content loads dynamically
-    setTimeout(() => {
-      console.log('SaveChat:Retrying to find responses after delay...');
+      // Add save buttons to existing responses
       this.addSaveButtonsToExistingResponses();
-    }, 2000);
+
+      // More aggressive retry strategy for first response
+      setTimeout(() => {
+        console.log('SaveChat: First retry to find responses...');
+        this.addSaveButtonsToExistingResponses();
+      }, 1000);
+
+      setTimeout(() => {
+        console.log('SaveChat: Second retry to find responses...');
+        this.addSaveButtonsToExistingResponses();
+      }, 2000);
+
+      setTimeout(() => {
+        console.log('SaveChat: Third retry to find responses...');
+        this.addSaveButtonsToExistingResponses();
+      }, 3000);
+
+      // Keep trying for a while to catch the first response
+      let retryCount = 0;
+      const maxRetries = 15;
+      const retryInterval = setInterval(() => {
+        retryCount++;
+        console.log(`SaveChat: Retry ${retryCount}/${maxRetries} for first response...`);
+        this.addSaveButtonsToExistingResponses();
+
+        if (retryCount >= maxRetries) {
+          clearInterval(retryInterval);
+          console.log('SaveChat: Stopped retrying for first response');
+        }
+      }, 2000);
+    });
 
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (request.action === 'getRecentSaved') {
-        this.getRecentSavedResponse().then(sendResponse);
-        return true; // Keep message channel open for async response
+      try {
+        // Check if extension context is valid
+        if (!this.isExtensionContextValid()) {
+          console.log('SaveChat: Extension context invalid in message listener');
+          sendResponse(null);
+          return;
+        }
+
+        if (request.action === 'getRecentSaved') {
+          this.getRecentSavedResponse().then(sendResponse);
+          return true; // Keep message channel open for async response
+        }
+      } catch (error) {
+        console.error('SaveChat: Error in message listener:', error);
+        sendResponse(null);
       }
     });
 
     // Monitor for navigation changes (ChatGPT is a SPA)
     this.monitorNavigation();
+
+    // Periodically check if extension context is still valid
+    this.startContextMonitoring();
+  }
+
+  startContextMonitoring() {
+    // Check extension context every 30 seconds
+    setInterval(() => {
+      if (!this.isExtensionContextValid()) {
+        console.log('SaveChat: Extension context became invalid, handling...');
+        this.handleContextInvalidation();
+      }
+    }, 30000);
+  }
+
+  async waitForChatGPTReady() {
+    // Wait for ChatGPT's main elements to be present
+    const maxWaitTime = 10000; // 10 seconds max
+    const checkInterval = 100; // Check every 100ms
+    let elapsed = 0;
+
+    while (elapsed < maxWaitTime) {
+      // Check for ChatGPT's main container
+      const mainContainer = this.findChatContainer();
+      if (mainContainer && mainContainer !== document.body) {
+        console.log('SaveChat: ChatGPT container found after', elapsed, 'ms');
+        return;
+      }
+
+      // Also check for any response elements
+      const hasResponses = document.querySelector('[data-message-author-role="assistant"], .markdown, .prose');
+      if (hasResponses) {
+        console.log('SaveChat: Response elements found after', elapsed, 'ms');
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      elapsed += checkInterval;
+    }
+
+    console.log('SaveChat: Timeout waiting for ChatGPT to be ready, proceeding anyway...');
   }
 
   monitorNavigation() {
@@ -127,8 +209,8 @@ class SaveChatContent {
     // Clear saved responses set for new conversation
     this.savedResponses.clear();
 
-    // Wait a bit for the new content to load, then re-initialize
-    setTimeout(() => {
+    // Wait for ChatGPT to be ready, then re-initialize
+    this.waitForChatGPTReady().then(() => {
       console.log('SaveChat: Re-initializing after navigation...');
       this.startObserver();
       this.addSaveButtonsToExistingResponses();
@@ -152,7 +234,7 @@ class SaveChatContent {
           console.log('SaveChat: Stopped retrying after navigation');
         }
       }, 3000);
-    }, 500);
+    });
   }
 
   debugPageStructure() {
@@ -206,13 +288,22 @@ class SaveChatContent {
   findChatContainer() {
     // Try different selectors for ChatGPT's main container
     const selectors = [
+      // Main chat area selectors
       '[data-testid="conversation-turn-2"]',
+      '[data-testid="conversation-turn-3"]',
+      '[data-testid="conversation-turn-4"]',
       '.flex.flex-col.items-center',
       '[role="main"]',
       '.flex-1.overflow-hidden',
       'main',
       '#__next',
-      '.min-h-screen'
+      '.min-h-screen',
+      // New ChatGPT selectors
+      '[data-testid="chat-messages"]',
+      '.flex.flex-col.items-center.text-base',
+      '.flex.flex-col.items-center.text-base.md\\:max-w-2xl.lg\\:max-w-[38rem].xl\\:max-w-3xl',
+      // Fallback to body if nothing else works
+      'body'
     ];
 
     for (const selector of selectors) {
@@ -238,7 +329,14 @@ class SaveChatContent {
         'div[data-message-author-role="assistant"]',
         '[data-message-author-role="assistant"]',
         '.group.w-full.text-gray-800.dark\\:text-gray-100',
-        '.flex.flex-col.items-center.text-base'
+        '.flex.flex-col.items-center.text-base',
+        // New selectors for responses being generated
+        '.markdown',
+        '.prose',
+        '.whitespace-pre-wrap',
+        // Look for any div that might be a response
+        'div[class*="group"]',
+        'div[class*="flex"]'
       ];
 
       selectors.forEach(selector => {
@@ -246,9 +344,8 @@ class SaveChatContent {
         if (responses.length > 0) {
           console.log(`SaveChat: Found ${responses.length} response(s) in added node with selector: ${selector}`);
           responses.forEach(response => {
-            // Only add to assistant responses, not user messages
-            if (response.getAttribute('data-message-author-role') === 'assistant' ||
-              !response.getAttribute('data-message-author-role')) {
+            // Check if this looks like an assistant response
+            if (this.looksLikeAssistantResponse(response)) {
               this.addSaveButton(response);
             }
           });
@@ -268,8 +365,44 @@ class SaveChatContent {
     return node.matches && responseSelectors.some(selector => node.matches(selector));
   }
 
+  looksLikeAssistantResponse(element) {
+    // Check if this element looks like an assistant response
+    const isAssistant = element.getAttribute('data-message-author-role') === 'assistant';
+    const isUser = element.getAttribute('data-message-author-role') === 'user';
+    
+    // If it's explicitly marked as user, it's not an assistant response
+    if (isUser) {
+      return false;
+    }
+    
+    const hasMarkdown = element.querySelector('.markdown, .prose, .whitespace-pre-wrap');
+    const hasTextContent = element.textContent && element.textContent.trim().length > 10;
+    
+    // Check for common ChatGPT response patterns
+    const hasResponseClasses = element.className.includes('group') || 
+                              element.className.includes('flex') ||
+                              element.className.includes('text-gray');
+    
+    // Check if it's not a user input area
+    const isNotInput = !element.querySelector('textarea, input, [contenteditable="true"]');
+    
+    // Check if it's not a button or UI element
+    const isNotUI = !element.matches('button, .button, [role="button"]') && 
+                   !element.closest('button, .button, [role="button"]');
+    
+    // Check if it's not already a save button
+    const isNotSaveButton = !element.classList.contains('savechat-button') && 
+                           !element.classList.contains('savechat-button-container');
+    
+    // Must be either explicitly marked as assistant OR have the right characteristics
+    return (isAssistant || (hasMarkdown && hasTextContent && hasResponseClasses && isNotInput && isNotUI && isNotSaveButton));
+  }
+
   addSaveButtonsToExistingResponses() {
     console.log('SaveChat: Looking for existing responses...');
+
+    // First, clean up any duplicate buttons
+    this.cleanupDuplicateButtons();
 
     // Try multiple selectors for ChatGPT responses
     const selectors = [
@@ -278,7 +411,11 @@ class SaveChatContent {
       '.group.w-full.text-gray-800.dark\\:text-gray-100',
       '.flex.flex-col.items-center.text-base',
       '.markdown',
-      '.prose'
+      '.prose',
+      // New selectors for responses being generated
+      '.whitespace-pre-wrap',
+      'div[class*="group"]',
+      'div[class*="flex"]'
     ];
 
     let totalResponses = 0;
@@ -286,9 +423,8 @@ class SaveChatContent {
       const responses = document.querySelectorAll(selector);
       console.log(`SaveChat: Found ${responses.length} responses with selector: ${selector}`);
       responses.forEach(response => {
-        // Only add to assistant responses, not user messages
-        if (response.getAttribute('data-message-author-role') === 'assistant' ||
-          !response.getAttribute('data-message-author-role')) {
+        // Use the same logic as checkForNewResponses
+        if (this.looksLikeAssistantResponse(response)) {
           this.addSaveButton(response);
           totalResponses++;
         }
@@ -298,14 +434,59 @@ class SaveChatContent {
     console.log(`SaveChat: Total responses processed: ${totalResponses}`);
   }
 
+  cleanupDuplicateButtons() {
+    // Find all save button containers
+    const buttonContainers = document.querySelectorAll('.savechat-button-container');
+    
+    buttonContainers.forEach(container => {
+      const responseElement = container.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
+      
+      if (responseElement) {
+        // Check if this response has multiple buttons
+        const buttonsInResponse = responseElement.querySelectorAll('.savechat-button-container');
+        
+        if (buttonsInResponse.length > 1) {
+          console.log('SaveChat: Found duplicate buttons, removing extras...');
+          // Keep only the first button, remove the rest
+          for (let i = 1; i < buttonsInResponse.length; i++) {
+            buttonsInResponse[i].remove();
+          }
+        }
+      }
+    });
+  }
+
   addSaveButton(responseElement) {
-    // Avoid adding multiple buttons
-    if (responseElement.querySelector('.savechat-button')) {
+    // Avoid adding multiple buttons - check more thoroughly
+    if (responseElement.querySelector('.savechat-button') || 
+        responseElement.querySelector('.savechat-button-container') ||
+        responseElement.closest('.savechat-button-container')) {
       console.log('SaveChat: Button already exists for this response');
       return;
     }
 
+    // Also check if this response element is already part of a response that has a button
+    const parentWithButton = responseElement.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
+    if (parentWithButton && parentWithButton !== responseElement && 
+        parentWithButton.querySelector('.savechat-button')) {
+      console.log('SaveChat: Parent response already has a button');
+      return;
+    }
+
     console.log('SaveChat: Adding save button to response element:', responseElement);
+
+    // Check if the response is ready for button insertion
+    if (!this.isResponseReady(responseElement)) {
+      console.log('SaveChat: Response not ready yet, will retry...');
+      // Retry after a short delay
+      setTimeout(() => {
+        if (!responseElement.querySelector('.savechat-button') && 
+            !responseElement.querySelector('.savechat-button-container')) {
+          this.addSaveButton(responseElement);
+        }
+      }, 500);
+      return;
+    }
 
     // Create button container
     const buttonContainer = document.createElement('div');
@@ -341,13 +522,27 @@ class SaveChatContent {
     }
   }
 
+  isResponseReady(responseElement) {
+    // Check if the response has enough content to be considered ready
+    const hasTextContent = responseElement.textContent && responseElement.textContent.trim().length > 10;
+    const hasMarkdown = responseElement.querySelector('.markdown, .prose, .whitespace-pre-wrap');
+    const hasStructure = responseElement.children.length > 0;
+    
+    // Response is ready if it has text content and some structure
+    return hasTextContent && (hasMarkdown || hasStructure);
+  }
+
   findInsertTarget(responseElement) {
     // Try to find the message content area
     const selectors = [
       '.markdown',
       '.prose',
       '.whitespace-pre-wrap',
-      '[data-message-author-role="assistant"] > div:last-child'
+      '[data-message-author-role="assistant"] > div:last-child',
+      // New selectors for responses being generated
+      'div:last-child',
+      '.flex.flex-col > div:last-child',
+      '.group > div:last-child'
     ];
 
     for (const selector of selectors) {
@@ -365,13 +560,20 @@ class SaveChatContent {
 
   async saveResponse(responseElement, button) {
     try {
+      // Check if extension context is still valid
+      if (!this.isExtensionContextValid()) {
+        console.log('SaveChat: Extension context invalid, reloading content script...');
+        this.handleContextInvalidation();
+        return;
+      }
+
       // Disable button during save
       button.disabled = true;
 
       // Extract response text
       const responseText = this.extractResponseText(responseElement);
-      if (!responseText.trim()) {
-        throw new Error('No text content found');
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error('No response text found');
       }
 
       // Get conversation context
@@ -379,11 +581,11 @@ class SaveChatContent {
 
       // Create save data
       const saveData = {
+        id: Date.now().toString(),
         text: responseText,
         context: context,
-        timestamp: new Date().toISOString(),
         url: window.location.href,
-        title: document.title
+        timestamp: Date.now()
       };
 
       // Save to storage
@@ -392,26 +594,44 @@ class SaveChatContent {
       // Update button state
       this.updateButtonState(button, true);
 
-      // Add to saved set
-      this.savedResponses.add(responseElement);
-
       console.log('SaveChat: Response saved successfully');
 
     } catch (error) {
       console.error('SaveChat: Error saving response:', error);
-      this.updateButtonState(button, false, 'Error');
+      
+      // Handle specific error types
+      if (error.message.includes('Extension context invalidated')) {
+        console.log('SaveChat: Extension context invalidated, reloading...');
+        this.handleContextInvalidation();
+      } else {
+        // Update button state to show error
+        this.updateButtonState(button, false, error.message);
+      }
     }
   }
 
   extractResponseText(responseElement) {
-    // Try to get the markdown content
-    const markdownElement = responseElement.querySelector('.markdown, .prose');
-    if (markdownElement) {
-      return markdownElement.innerText || markdownElement.textContent;
-    }
-
-    // Fallback to the entire response text
-    return responseElement.innerText || responseElement.textContent;
+    // Clone the element to avoid modifying the original
+    const clone = responseElement.cloneNode(true);
+    
+    // Remove all save button containers from the clone
+    const buttonContainers = clone.querySelectorAll('.savechat-button-container, .savechat-button');
+    buttonContainers.forEach(button => button.remove());
+    
+    // Remove other UI elements that shouldn't be part of the response
+    const uiElements = clone.querySelectorAll('button, .button, [role="button"], .ui-element, .controls');
+    uiElements.forEach(element => element.remove());
+    
+    // Get the text content from the cleaned clone
+    const text = clone.textContent || '';
+    
+    // Clean up the text
+    return text
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .replace(/^\s+|\s+$/g, '')  // Trim whitespace
+      .replace(/Save Response/g, '')  // Remove any remaining "Save Response" text
+      .replace(/💾/g, '')  // Remove save icon
+      .trim();
   }
 
   getConversationContext(responseElement) {
@@ -442,16 +662,46 @@ class SaveChatContent {
 
   async saveToStorage(saveData) {
     return new Promise((resolve, reject) => {
-      chrome.storage.local.get({ savedResponses: [] }, (data) => {
-        const updated = [saveData, ...data.savedResponses];
-        chrome.storage.local.set({ savedResponses: updated }, () => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve();
+      try {
+        // Check if extension context is valid before accessing storage
+        if (!this.isExtensionContextValid()) {
+          reject(new Error('Extension context invalidated'));
+          return;
+        }
+
+        chrome.storage.local.get({ savedResponses: [] }, (data) => {
+          try {
+            // Check context again inside callback
+            if (!this.isExtensionContextValid()) {
+              reject(new Error('Extension context invalidated'));
+              return;
+            }
+
+            const updated = [saveData, ...data.savedResponses];
+            chrome.storage.local.set({ savedResponses: updated }, () => {
+              try {
+                // Final context check
+                if (!this.isExtensionContextValid()) {
+                  reject(new Error('Extension context invalidated'));
+                  return;
+                }
+
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve();
+                }
+              } catch (error) {
+                reject(error);
+              }
+            });
+          } catch (error) {
+            reject(error);
           }
         });
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -481,11 +731,96 @@ class SaveChatContent {
 
   async getRecentSavedResponse() {
     return new Promise((resolve) => {
-      chrome.storage.local.get({ savedResponses: [] }, (data) => {
-        const responses = data.savedResponses || [];
-        resolve(responses[0] || null);
-      });
+      try {
+        // Check if extension context is valid
+        if (!this.isExtensionContextValid()) {
+          console.log('SaveChat: Extension context invalid in getRecentSavedResponse');
+          resolve(null);
+          return;
+        }
+
+        chrome.storage.local.get({ savedResponses: [] }, (data) => {
+          try {
+            // Check context again inside callback
+            if (!this.isExtensionContextValid()) {
+              console.log('SaveChat: Extension context invalid in storage callback');
+              resolve(null);
+              return;
+            }
+
+            const responses = data.savedResponses || [];
+            const recentResponse = responses.length > 0 ? responses[0] : null;
+            resolve(recentResponse);
+          } catch (error) {
+            console.error('SaveChat: Error in getRecentSavedResponse callback:', error);
+            resolve(null);
+          }
+        });
+      } catch (error) {
+        console.error('SaveChat: Error in getRecentSavedResponse:', error);
+        resolve(null);
+      }
     });
+  }
+
+  isExtensionContextValid() {
+    try {
+      // Try to access a Chrome API to check if context is valid
+      return typeof chrome !== 'undefined' && 
+             chrome.runtime && 
+             chrome.runtime.id;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  handleContextInvalidation() {
+    // Remove all existing buttons
+    const existingButtons = document.querySelectorAll('.savechat-button');
+    existingButtons.forEach(button => button.remove());
+
+    // Try to reinitialize after a short delay
+    setTimeout(() => {
+      if (this.isExtensionContextValid()) {
+        console.log('SaveChat: Reinitializing after context invalidation...');
+        this.init();
+      } else {
+        console.log('SaveChat: Extension context still invalid, user may need to reload page');
+        // Show a message to the user
+        this.showContextError();
+      }
+    }, 1000);
+  }
+
+  showContextError() {
+    // Create a notification to inform the user
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10000;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    `;
+    notification.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 4px;">SaveChat Extension Error</div>
+      <div style="font-size: 12px;">Please refresh the page to restore functionality.</div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 5000);
   }
 }
 
