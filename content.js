@@ -256,8 +256,28 @@ class SaveChatContent {
       console.log(`SaveChat: ${name}: ${found.length} found`);
       if (found.length > 0) {
         console.log(`SaveChat: First ${name} element:`, found[0]);
+        // Log the data-message-author-role attribute for the first element
+        const role = found[0].getAttribute('data-message-author-role');
+        if (role) {
+          console.log(`SaveChat: First ${name} role: ${role}`);
+        }
       }
     });
+
+    // Specifically check for user vs assistant messages
+    const userMessages = document.querySelectorAll('[data-message-author-role="user"]');
+    const assistantMessages = document.querySelectorAll('[data-message-author-role="assistant"]');
+    
+    console.log(`SaveChat: User messages: ${userMessages.length}`);
+    console.log(`SaveChat: Assistant messages: ${assistantMessages.length}`);
+    
+    // Log a few examples of each
+    if (userMessages.length > 0) {
+      console.log('SaveChat: Example user message:', userMessages[0]);
+    }
+    if (assistantMessages.length > 0) {
+      console.log('SaveChat: Example assistant message:', assistantMessages[0]);
+    }
   }
 
   startObserver() {
@@ -324,19 +344,17 @@ class SaveChatContent {
       console.log('SaveChat: Found new response node');
       this.addSaveButton(node);
     } else if (node.querySelectorAll) {
-      // Try multiple selectors for ChatGPT responses
+      // Try multiple selectors for ChatGPT responses - be more specific about assistant responses
       const selectors = [
         'div[data-message-author-role="assistant"]',
         '[data-message-author-role="assistant"]',
-        '.group.w-full.text-gray-800.dark\\:text-gray-100',
-        '.flex.flex-col.items-center.text-base',
-        // New selectors for responses being generated
-        '.markdown',
-        '.prose',
-        '.whitespace-pre-wrap',
-        // Look for any div that might be a response
-        'div[class*="group"]',
-        'div[class*="flex"]'
+        // More specific selectors for assistant responses
+        '.group.w-full.text-gray-800.dark\\:text-gray-100[data-message-author-role="assistant"]',
+        '.flex.flex-col.items-center.text-base[data-message-author-role="assistant"]',
+        // Only look for markdown/prose within assistant messages
+        '[data-message-author-role="assistant"] .markdown',
+        '[data-message-author-role="assistant"] .prose',
+        '[data-message-author-role="assistant"] .whitespace-pre-wrap'
       ];
 
       selectors.forEach(selector => {
@@ -358,8 +376,13 @@ class SaveChatContent {
     const responseSelectors = [
       'div[data-message-author-role="assistant"]',
       '[data-message-author-role="assistant"]',
-      '.group.w-full.text-gray-800.dark\\:text-gray-100',
-      '.flex.flex-col.items-center.text-base'
+      // More specific selectors for assistant responses
+      '.group.w-full.text-gray-800.dark\\:text-gray-100[data-message-author-role="assistant"]',
+      '.flex.flex-col.items-center.text-base[data-message-author-role="assistant"]',
+      // Only look for markdown/prose within assistant messages
+      '[data-message-author-role="assistant"] .markdown',
+      '[data-message-author-role="assistant"] .prose',
+      '[data-message-author-role="assistant"] .whitespace-pre-wrap'
     ];
 
     return node.matches && responseSelectors.some(selector => node.matches(selector));
@@ -373,6 +396,27 @@ class SaveChatContent {
     // If it's explicitly marked as user, it's not an assistant response
     if (isUser) {
       return false;
+    }
+    
+    // If it's not explicitly marked as assistant, we need to be more careful
+    if (!isAssistant) {
+      // Check if this element is actually part of a user message
+      const parentUser = element.closest('[data-message-author-role="user"]');
+      if (parentUser) {
+        return false;
+      }
+      
+      // Check if this element contains user input elements
+      const hasUserInput = element.querySelector('textarea, input, [contenteditable="true"], [role="textbox"]');
+      if (hasUserInput) {
+        return false;
+      }
+      
+      // Check if this element is in a user message container
+      const userContainer = element.closest('.group[data-message-author-role="user"], .flex[data-message-author-role="user"]');
+      if (userContainer) {
+        return false;
+      }
     }
     
     const hasMarkdown = element.querySelector('.markdown, .prose, .whitespace-pre-wrap');
@@ -404,18 +448,17 @@ class SaveChatContent {
     // First, clean up any duplicate buttons
     this.cleanupDuplicateButtons();
 
-    // Try multiple selectors for ChatGPT responses
+    // Try multiple selectors for ChatGPT responses - be more specific about assistant responses
     const selectors = [
       'div[data-message-author-role="assistant"]',
       '[data-message-author-role="assistant"]',
-      '.group.w-full.text-gray-800.dark\\:text-gray-100',
-      '.flex.flex-col.items-center.text-base',
-      '.markdown',
-      '.prose',
-      // New selectors for responses being generated
-      '.whitespace-pre-wrap',
-      'div[class*="group"]',
-      'div[class*="flex"]'
+      // More specific selectors for assistant responses
+      '.group.w-full.text-gray-800.dark\\:text-gray-100[data-message-author-role="assistant"]',
+      '.flex.flex-col.items-center.text-base[data-message-author-role="assistant"]',
+      // Only look for markdown/prose within assistant messages
+      '[data-message-author-role="assistant"] .markdown',
+      '[data-message-author-role="assistant"] .prose',
+      '[data-message-author-role="assistant"] .whitespace-pre-wrap'
     ];
 
     let totalResponses = 0;
@@ -435,15 +478,15 @@ class SaveChatContent {
   }
 
   cleanupDuplicateButtons() {
-    // Find all save button containers
-    const buttonContainers = document.querySelectorAll('.savechat-button-container');
+    // Find all save buttons
+    const saveButtons = document.querySelectorAll('.savechat-button');
     
-    buttonContainers.forEach(container => {
-      const responseElement = container.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
+    saveButtons.forEach(button => {
+      const responseElement = button.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
       
       if (responseElement) {
-        // Check if this response has multiple buttons
-        const buttonsInResponse = responseElement.querySelectorAll('.savechat-button-container');
+        // Check if this response has multiple save buttons
+        const buttonsInResponse = responseElement.querySelectorAll('.savechat-button');
         
         if (buttonsInResponse.length > 1) {
           console.log('SaveChat: Found duplicate buttons, removing extras...');
@@ -459,8 +502,7 @@ class SaveChatContent {
   addSaveButton(responseElement) {
     // Avoid adding multiple buttons - check more thoroughly
     if (responseElement.querySelector('.savechat-button') || 
-        responseElement.querySelector('.savechat-button-container') ||
-        responseElement.closest('.savechat-button-container')) {
+        responseElement.closest('.savechat-button')) {
       console.log('SaveChat: Button already exists for this response');
       return;
     }
@@ -481,26 +523,63 @@ class SaveChatContent {
       // Retry after a short delay
       setTimeout(() => {
         if (!responseElement.querySelector('.savechat-button') && 
-            !responseElement.querySelector('.savechat-button-container')) {
+            !responseElement.closest('.savechat-button')) {
           this.addSaveButton(responseElement);
         }
       }, 500);
       return;
     }
 
-    // Create button container
-    const buttonContainer = document.createElement('div');
-    buttonContainer.className = 'savechat-button-container';
-    buttonContainer.style.marginTop = '8px';
-    buttonContainer.style.marginBottom = '8px';
-
-    // Create save button
+    // Create save button that matches ChatGPT's toolbar style
     const saveButton = document.createElement('button');
     saveButton.className = 'savechat-button';
-    saveButton.innerHTML = `
-      <span class="icon">💾</span>
-      <span class="text">Save Response</span>
+    saveButton.setAttribute('data-testid', 'savechat-save-button');
+    saveButton.setAttribute('aria-label', 'Save response');
+    saveButton.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #6b7280;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin: 0;
+      line-height: 1;
+      min-width: 32px;
+      height: 32px;
+      position: relative;
     `;
+    
+    // Create SVG icon similar to ChatGPT's style
+    const svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+        <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H9L11 6H19C20.1046 6 21 6.89543 21 8V19C21 20.1046 20.1046 21 19 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M17 21V13H7V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7 3V6H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    
+    saveButton.innerHTML = `
+      ${svgIcon}
+      <span style="font-size: 14px; font-weight: 500;">Save</span>
+    `;
+
+    // Add hover effects that match ChatGPT's style
+    saveButton.addEventListener('mouseenter', () => {
+      saveButton.style.background = '#f3f4f6';
+      saveButton.style.color = '#374151';
+    });
+
+    saveButton.addEventListener('mouseleave', () => {
+      saveButton.style.background = 'transparent';
+      saveButton.style.color = '#6b7280';
+    });
 
     // Add click handler
     saveButton.addEventListener('click', async (e) => {
@@ -510,15 +589,27 @@ class SaveChatContent {
       await this.saveResponse(responseElement, saveButton);
     });
 
-    buttonContainer.appendChild(saveButton);
-
     // Find the best place to insert the button
     const insertTarget = this.findInsertTarget(responseElement);
     if (insertTarget) {
       console.log('SaveChat: Inserting button into target:', insertTarget);
-      insertTarget.appendChild(buttonContainer);
+      insertTarget.appendChild(saveButton);
     } else {
-      console.log('SaveChat: Could not find insert target for button');
+      console.log('SaveChat: Could not find insert target for button, will retry...');
+      // Retry after a short delay in case the toolbar appears later
+      setTimeout(() => {
+        if (!responseElement.querySelector('.savechat-button')) {
+          const retryTarget = this.findInsertTarget(responseElement);
+          if (retryTarget) {
+            console.log('SaveChat: Found insert target on retry');
+            retryTarget.appendChild(saveButton);
+          } else {
+            console.log('SaveChat: Still no insert target found, using fallback');
+            // Fallback: insert at the end of the response
+            responseElement.appendChild(saveButton);
+          }
+        }
+      }, 1000);
     }
   }
 
@@ -533,22 +624,103 @@ class SaveChatContent {
   }
 
   findInsertTarget(responseElement) {
-    // Try to find the message content area
-    const selectors = [
+    // Debug: Log what we're looking for
+    console.log('SaveChat: Looking for toolbar in response element:', responseElement);
+    
+    // First, try to find the ChatGPT toolbar (where copy and edit buttons are)
+    const toolbarSelectors = [
+      // ChatGPT's current toolbar selectors (updated for latest version)
+      '[data-testid="message-actions"]',
+      '.flex.items-center.justify-between',
+      '.flex.items-center.gap-2',
+      '.flex.items-center.space-x-2',
+      // Look for the specific toolbar container that appears after responses
+      '.flex.items-center.gap-1',
+      '.flex.items-center.gap-3',
+      // More specific patterns for ChatGPT's toolbar
+      'div[class*="flex"][class*="items-center"][class*="gap"]',
+      // Look for containers with copy/edit buttons
+      'div:has(button[data-testid*="copy"])',
+      'div:has(button[aria-label*="copy"])',
+      'div:has(button[aria-label*="Copy"])',
+      // Fallback selectors
+      '.flex.items-center',
+      '.flex.gap-2',
+      '.flex.space-x-2'
+    ];
+
+    // First, try to find toolbar within the response element
+    for (const selector of toolbarSelectors) {
+      const toolbar = responseElement.querySelector(selector);
+      if (toolbar) {
+        console.log('SaveChat: Found potential toolbar with selector:', selector, toolbar);
+        if (this.looksLikeToolbar(toolbar)) {
+          console.log('SaveChat: Confirmed as toolbar with selector:', selector);
+          return toolbar;
+        } else {
+          console.log('SaveChat: Not a toolbar:', toolbar);
+        }
+      }
+    }
+
+    // If no toolbar found in response element, look in the parent response container
+    const parentResponse = responseElement.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
+    if (parentResponse) {
+      console.log('SaveChat: Looking in parent response:', parentResponse);
+      for (const selector of toolbarSelectors) {
+        const toolbar = parentResponse.querySelector(selector);
+        if (toolbar) {
+          console.log('SaveChat: Found potential toolbar in parent with selector:', selector, toolbar);
+          if (this.looksLikeToolbar(toolbar)) {
+            console.log('SaveChat: Confirmed as toolbar in parent with selector:', selector);
+            return toolbar;
+          } else {
+            console.log('SaveChat: Not a toolbar in parent:', toolbar);
+          }
+        }
+      }
+    }
+
+    // If still no toolbar, look for it in the broader context
+    // ChatGPT sometimes places the toolbar outside the immediate response container
+    const responseContainer = responseElement.closest('[data-message-author-role="assistant"]');
+    if (responseContainer) {
+      // Look for toolbar in the same container or adjacent elements
+      const container = responseContainer.parentElement;
+      if (container) {
+        for (const selector of toolbarSelectors) {
+          const toolbar = container.querySelector(selector);
+          if (toolbar && this.looksLikeToolbar(toolbar)) {
+            console.log('SaveChat: Found toolbar in container with selector:', selector);
+            return toolbar;
+          }
+        }
+      }
+    }
+
+    // If no toolbar found, try to create one or find a suitable place to insert
+    const messageContainer = responseElement.closest('[data-message-author-role="assistant"]');
+    if (messageContainer) {
+      // Look for existing button containers or create a new one
+      const existingButtonContainer = messageContainer.querySelector('.flex.items-center, .flex.gap-2');
+      if (existingButtonContainer) {
+        console.log('SaveChat: Found existing button container');
+        return existingButtonContainer;
+      }
+    }
+
+    // Fallback: try to find the message content area
+    const contentSelectors = [
       '.markdown',
       '.prose',
       '.whitespace-pre-wrap',
-      '[data-message-author-role="assistant"] > div:last-child',
-      // New selectors for responses being generated
-      'div:last-child',
-      '.flex.flex-col > div:last-child',
-      '.group > div:last-child'
+      '[data-message-author-role="assistant"] > div:last-child'
     ];
 
-    for (const selector of selectors) {
+    for (const selector of contentSelectors) {
       const target = responseElement.querySelector(selector);
       if (target) {
-        console.log('SaveChat: Found insert target with selector:', selector);
+        console.log('SaveChat: Found content target with selector:', selector);
         return target;
       }
     }
@@ -556,6 +728,52 @@ class SaveChatContent {
     console.log('SaveChat: No specific target found, using response element itself');
     // Fallback to the response element itself
     return responseElement;
+  }
+
+  looksLikeToolbar(element) {
+    // Check if this element looks like a toolbar
+    const hasButtons = element.querySelectorAll('button, [role="button"], [data-testid*="button"]').length > 0;
+    
+    // Check for ChatGPT's specific toolbar buttons
+    const hasCopyButton = element.textContent.includes('Copy') || 
+                         element.querySelector('[data-testid*="copy"]') ||
+                         element.querySelector('[aria-label*="copy"]') ||
+                         element.querySelector('[aria-label*="Copy"]') ||
+                         element.querySelector('button[title*="copy"]') ||
+                         element.querySelector('button[title*="Copy"]');
+    
+    const hasEditButton = element.textContent.includes('Edit') || 
+                         element.querySelector('[data-testid*="edit"]') ||
+                         element.querySelector('[aria-label*="edit"]') ||
+                         element.querySelector('[aria-label*="Edit"]') ||
+                         element.querySelector('button[title*="edit"]') ||
+                         element.querySelector('button[title*="Edit"]');
+    
+    const hasCanvasButton = element.textContent.includes('Canvas') || 
+                           element.querySelector('[data-testid*="canvas"]') ||
+                           element.querySelector('[aria-label*="canvas"]') ||
+                           element.querySelector('[aria-label*="Canvas"]');
+    
+    const hasRegenerateButton = element.textContent.includes('Regenerate') ||
+                               element.querySelector('[data-testid*="regenerate"]') ||
+                               element.querySelector('[aria-label*="regenerate"]');
+    
+    const hasContinueButton = element.textContent.includes('Continue') ||
+                             element.querySelector('[data-testid*="continue"]') ||
+                             element.querySelector('[aria-label*="continue"]');
+    
+    // Check for common ChatGPT toolbar patterns
+    const hasToolbarClasses = element.className.includes('flex') && 
+                             element.className.includes('items-center') &&
+                             (element.className.includes('gap') || element.className.includes('space'));
+    
+    // It's likely a toolbar if it has buttons and contains ChatGPT's specific functionality
+    const hasChatGPTButtons = hasCopyButton || hasEditButton || hasCanvasButton || hasRegenerateButton || hasContinueButton;
+    
+    // Additional check: look for SVG icons that are common in ChatGPT's toolbar
+    const hasSVGIcons = element.querySelectorAll('svg').length > 0;
+    
+    return hasButtons && (hasChatGPTButtons || (hasToolbarClasses && hasSVGIcons));
   }
 
   async saveResponse(responseElement, button) {
@@ -706,26 +924,79 @@ class SaveChatContent {
   }
 
   updateButtonState(button, saved, errorText = null) {
-    const iconSpan = button.querySelector('.icon');
-    const textSpan = button.querySelector('.text');
-
     if (saved) {
-      button.classList.add('saved');
-      iconSpan.textContent = '✅';
-      textSpan.textContent = 'Saved!';
+      // Success state - use checkmark SVG
+      const checkmarkSVG = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+          <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+      
+      button.innerHTML = `
+        ${checkmarkSVG}
+        <span style="font-size: 14px; font-weight: 500;">Saved</span>
+      `;
+      button.style.background = '#10b981';
+      button.style.color = 'white';
+      button.disabled = true;
 
       // Reset after 3 seconds
       setTimeout(() => {
-        button.classList.remove('saved');
-        iconSpan.textContent = '💾';
-        textSpan.textContent = 'Save Response';
-        button.disabled = false;
+        if (button.parentNode) {
+          const originalSVG = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+              <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H9L11 6H19C20.1046 6 21 6.89543 21 8V19C21 20.1046 20.1046 21 19 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 21V13H7V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M7 3V6H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          `;
+          
+          button.innerHTML = `
+            ${originalSVG}
+            <span style="font-size: 14px; font-weight: 500;">Save</span>
+          `;
+          button.style.background = 'transparent';
+          button.style.color = '#6b7280';
+          button.disabled = false;
+        }
       }, 3000);
     } else {
-      button.classList.remove('saved');
-      iconSpan.textContent = '❌';
-      textSpan.textContent = errorText || 'Save Response';
-      button.disabled = false;
+      // Error state - use X SVG
+      const errorSVG = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+      
+      button.innerHTML = `
+        ${errorSVG}
+        <span style="font-size: 14px; font-weight: 500;">Error</span>
+      `;
+      button.style.background = '#ef4444';
+      button.style.color = 'white';
+      button.disabled = true;
+
+      // Reset after 3 seconds
+      setTimeout(() => {
+        if (button.parentNode) {
+          const originalSVG = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+              <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H9L11 6H19C20.1046 6 21 6.89543 21 8V19C21 20.1046 20.1046 21 19 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 21V13H7V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M7 3V6H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          `;
+          
+          button.innerHTML = `
+            ${originalSVG}
+            <span style="font-size: 14px; font-weight: 500;">Save</span>
+          `;
+          button.style.background = 'transparent';
+          button.style.color = '#6b7280';
+          button.style.borderColor = 'transparent';
+          button.disabled = false;
+        }
+      }, 3000);
     }
   }
 
