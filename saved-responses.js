@@ -221,13 +221,14 @@ class SaveChatViewer {
         copyBtn.dataset.responseId = responseId;
         copyBtn.textContent = '📋 Copy';
         
-        const openBtn = document.createElement('button');
-        openBtn.className = 'action-btn primary open-original-btn';
-        openBtn.dataset.url = response.url || '';
-        openBtn.textContent = '🔗 Open Original';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'action-btn delete-btn';
+        deleteBtn.dataset.responseId = responseId;
+        deleteBtn.textContent = '🗑️ Delete';
+        deleteBtn.style.color = '#f20733';
         
         actions.appendChild(copyBtn);
-        actions.appendChild(openBtn);
+        actions.appendChild(deleteBtn);
 
         // Assemble card
         card.appendChild(header);
@@ -254,11 +255,11 @@ class SaveChatViewer {
             });
         });
 
-        // Open original buttons
-        document.querySelectorAll('.open-original-btn').forEach(btn => {
+        // Delete buttons
+        document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const url = e.target.dataset.url;
-                this.openOriginal(url);
+                const responseId = e.target.dataset.responseId;
+                this.deleteResponse(responseId);
             });
         });
     }
@@ -289,11 +290,32 @@ class SaveChatViewer {
         }
     }
 
-    openOriginal(url) {
-        if (url) {
-            chrome.tabs.create({ url });
-        } else {
-            chrome.tabs.create({ url: 'https://chat.openai.com' });
+    async deleteResponse(responseId) {
+        const response = this.responses.find(r => (r.id || Date.now()) == responseId);
+        if (!response) return;
+
+        try {
+            // Remove from responses array
+            this.responses = this.responses.filter(r => (r.id || Date.now()) != responseId);
+            
+            // Update filtered responses
+            this.filteredResponses = this.responses;
+            
+            // Save to storage
+            await new Promise((resolve) => {
+                chrome.storage.local.set({ savedResponses: this.responses }, () => {
+                    resolve();
+                });
+            });
+            
+            // Re-render
+            this.render();
+            
+            // Show success message
+            this.showError('Response deleted successfully', 'success');
+        } catch (error) {
+            console.error('Error deleting response:', error);
+            this.showError('Failed to delete response');
         }
     }
 

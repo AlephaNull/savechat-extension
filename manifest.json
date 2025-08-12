@@ -2,7 +2,11 @@
   "manifest_version": 3,
   "name": "SaveChat",
   "version": "1.0.0",
-  "description": "Save ChatGPT responses for later reference with enhanced featuresNever lose a great ChatGPT response again. SaveChat helps you save, organize, and revisit your favorite ChatGPT responses with one click. ",
+  "description": "Never lose a great ChatGPT response again. SaveChat helps you save, organize, and revisit your favorite ChatGPT responses with one click.",
+  "icons": {
+    "16": "icons/favicon-16x16.png",
+    "32": "icons/favicon-32x32.png"
+  },
   "permissions": [
     "storage",
     "scripting",
@@ -24,7 +28,11 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "SaveChat - View Saved Responses"
+    "default_title": "SaveChat - View Saved Responses",
+    "default_icon": {
+      "16": "icons/favicon-16x16.png",
+      "32": "icons/favicon-32x32.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
