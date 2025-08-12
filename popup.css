@@ -1,23 +1,24 @@
 /* SaveChat Popup Styles */
 
 * {
+  font-family: 'Funnel Display', sans-serif;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
 :root {
-  --text: #150a08;
-  --background: #faf2f2;
-  --primary: #be6159;
-  --secondary: #d4bc93;
-  --accent: #cbc57b;
+  --text: #060628;
+  --background: #f4f4fb;
+  --primary: #040481;
+  --secondary: #fa66c1;
+  --accent: #f20733;
 }
 
 body {
-  font-family: 'Noto Sans', sans-serif;
+  font-family: 'Funnel Display', sans-serif;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text);
   background: var(--background);
   width: 380px;
@@ -47,8 +48,9 @@ body {
 }
 
 .logo .icon {
-  font-size: 20px;
-  color: #773809;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .logo h1 {
@@ -198,33 +200,28 @@ body {
 .action-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
+  padding: 8px 16px;
+  border: none;
   border-radius: 6px;
-  background: #ffffff;
-  color: #374151;
-  font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
-  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
 .action-btn:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
+  background: var(--secondary);
+  color: var(--background);
 }
 
 .action-btn.primary {
-  background: #3b82f6;
+  background: var(--accent);
   color: white;
-  border-color: #3b82f6;
 }
 
 .action-btn.primary:hover {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--accent);
+  color: white;
 }
 
 .action-btn .icon {
