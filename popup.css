@@ -210,8 +210,8 @@ body {
 }
 
 .action-btn:hover {
-  background: var(--secondary);
-  color: var(--background);
+  background: #3b82f6;
+  color: white;
 }
 
 .action-btn.primary {

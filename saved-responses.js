@@ -188,7 +188,7 @@ class SaveChatViewer {
         title.textContent = context;
         const contextDiv = document.createElement('div');
         contextDiv.className = 'response-context';
-        contextDiv.textContent = response.url || 'chat.openai.com';
+        contextDiv.textContent = response.url || 'chatgpt.com';
         headerLeft.appendChild(title);
         headerLeft.appendChild(contextDiv);
         

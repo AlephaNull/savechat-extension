@@ -16,10 +16,7 @@ chrome.runtime.onInstalled.addListener((details) => {
       }
     });
     
-    // Open welcome page
-    chrome.tabs.create({
-      url: chrome.runtime.getURL('welcome.html')
-    });
+
   } else if (details.reason === 'update') {
     console.log('SaveChat extension updated');
   }
@@ -136,7 +133,7 @@ async function importResponses(importData) {
 // Handle tab updates to inject content script if needed
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
-    const isChatGPT = tab.url.includes('chatgpt.com') || tab.url.includes('chat.openai.com');
+    const isChatGPT = tab.url.includes('chatgpt.com');
     
     if (isChatGPT) {
       // Content script should auto-inject, but we can add additional logic here

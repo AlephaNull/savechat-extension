@@ -63,7 +63,7 @@ Once published to the Chrome Web Store:
 
 ### Saving Responses
 
-1. **Navigate to ChatGPT** (chatgpt.com or chat.openai.com)
+1. **Navigate to ChatGPT** (chatgpt.com)
 2. **Start a conversation** or open an existing one
 3. **Look for save buttons** (💾) that appear next to each response
 4. **Click "Save Response"** to save the response
