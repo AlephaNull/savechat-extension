@@ -172,7 +172,7 @@ class SaveChatViewer {
         const truncatedText = response.text.length > 300 ? 
             response.text.substring(0, 300) + '...' : response.text;
         const needsExpansion = response.text.length > 300;
-        const responseId = response.id || Date.now();
+        const responseId = response.id || `temp_${Date.now()}`;
 
         const card = document.createElement('div');
         card.className = 'response-card';
@@ -265,7 +265,7 @@ class SaveChatViewer {
     }
 
     expandResponse(responseId) {
-        const response = this.responses.find(r => (r.id || Date.now()) == responseId);
+        const response = this.responses.find(r => r.id == responseId);
         if (!response) return;
 
         const card = document.querySelector(`[data-id="${responseId}"]`);
@@ -278,7 +278,7 @@ class SaveChatViewer {
     }
 
     async copyResponse(responseId) {
-        const response = this.responses.find(r => (r.id || Date.now()) == responseId);
+        const response = this.responses.find(r => r.id == responseId);
         if (!response) return;
 
         try {
@@ -291,12 +291,12 @@ class SaveChatViewer {
     }
 
     async deleteResponse(responseId) {
-        const response = this.responses.find(r => (r.id || Date.now()) == responseId);
+        const response = this.responses.find(r => r.id == responseId);
         if (!response) return;
 
         try {
             // Remove from responses array
-            this.responses = this.responses.filter(r => (r.id || Date.now()) != responseId);
+            this.responses = this.responses.filter(r => r.id != responseId);
             
             // Update filtered responses
             this.filteredResponses = this.responses;

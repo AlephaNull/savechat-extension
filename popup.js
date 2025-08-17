@@ -38,9 +38,13 @@ class SaveChatPopup {
   }
 
   async getSavedResponses() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get({ savedResponses: [] }, (data) => {
-        resolve(data.savedResponses || []);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(data.savedResponses || []);
+        }
       });
     });
   }

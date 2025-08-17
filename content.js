@@ -11,14 +11,41 @@ class SaveChatContent {
   }
 
   init() {
+    console.log('SaveChat: Initializing...');
+    
+    // Immediate check for existing responses
+    setTimeout(() => {
+      console.log('SaveChat: Immediate check for existing responses...');
+      this.button.addSaveButtonsToAllResponses(this.detection, this.storage);
+    }, 100);
+    
     this.waitForChatGPTReady().then(() => {
+      console.log('SaveChat: ChatGPT ready, starting observer...');
       this.detection.startObserver((node) => this.checkForNewResponses(node));
       this.button.addSaveButtonsToAllResponses(this.detection, this.storage);
       
-      // Retry for responses that might still be loading
+      // Retry for responses that might still be loading - more aggressive
       setTimeout(() => {
+        console.log('SaveChat: First retry...');
+        this.button.addSaveButtonsToAllResponses(this.detection, this.storage);
+      }, 500); // Reduced from 1000ms to 500ms
+      
+      setTimeout(() => {
+        console.log('SaveChat: Second retry...');
         this.button.addSaveButtonsToAllResponses(this.detection, this.storage);
       }, 1000);
+      
+      // Periodic check for any missed responses - more frequent
+      setInterval(() => {
+        console.log('SaveChat: Periodic check for missed responses...');
+        this.button.addSaveButtonsToAllResponses(this.detection, this.storage);
+      }, 2000); // Reduced from 5000ms to 2000ms
+      
+      // Periodic cleanup of duplicate buttons
+      setInterval(() => {
+        console.log('SaveChat: Periodic cleanup of duplicate buttons...');
+        this.button.cleanupDuplicateButtons();
+      }, 3000);
     });
 
     // Listen for messages from popup
@@ -30,6 +57,7 @@ class SaveChatContent {
     });
 
     this.monitorNavigation();
+    this.monitorThemeChanges();
   }
 
   async waitForChatGPTReady() {
@@ -48,6 +76,7 @@ class SaveChatContent {
   }
 
   checkForNewResponses(node) {
+    console.log('SaveChat: Checking for new responses in node:', node);
     const responseSelectors = [
       'div[data-message-author-role="assistant"]',
       '[data-message-author-role="assistant"]',
@@ -60,9 +89,19 @@ class SaveChatContent {
 
     responseSelectors.forEach(selector => {
       const responses = node.querySelectorAll(selector);
+      console.log(`SaveChat: Found ${responses.length} responses with selector: ${selector}`);
       responses.forEach(response => {
         if (this.detection.looksLikeAssistantResponse(response)) {
+          console.log('SaveChat: Adding save button to response:', response);
           this.button.addSaveButtonToResponse(response, this.detection, this.storage);
+          
+          // Also try immediate addition for faster response
+          setTimeout(() => {
+            if (!response.querySelector('.savechat-button')) {
+              console.log('SaveChat: Immediate retry for response:', response);
+              this.button.addSaveButtonToResponse(response, this.detection, this.storage);
+            }
+          }, 100);
         }
       });
     });
@@ -70,6 +109,7 @@ class SaveChatContent {
 
   monitorNavigation() {
     let lastUrl = window.location.href;
+    let navigationInterval = null;
     
     const checkNavigation = () => {
       const currentUrl = window.location.href;
@@ -79,7 +119,14 @@ class SaveChatContent {
       }
     };
 
-    setInterval(checkNavigation, 1000);
+    navigationInterval = setInterval(checkNavigation, 1000);
+    
+    // Clean up interval when page unloads
+    window.addEventListener('beforeunload', () => {
+      if (navigationInterval) {
+        clearInterval(navigationInterval);
+      }
+    });
   }
 
   handleNavigation() {
@@ -90,6 +137,25 @@ class SaveChatContent {
       this.detection.startObserver((node) => this.checkForNewResponses(node));
       this.button.addSaveButtonsToAllResponses(this.detection, this.storage);
     });
+  }
+
+  monitorThemeChanges() {
+    // Listen for theme changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && 
+            (mutation.attributeName === 'class' || mutation.attributeName === 'data-theme')) {
+          // Theme changed, update existing buttons
+          setTimeout(() => {
+            this.button.updateButtonThemes();
+          }, 100);
+        }
+      });
+    });
+
+    // Observe document and body for theme changes
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
 }
 
@@ -102,14 +168,59 @@ if (document.readyState === 'loading') {
   window.saveChatInstance = new SaveChatContent();
 }
 
+// Add visual indicator that extension is loaded
+const indicator = document.createElement('div');
+indicator.id = 'savechat-indicator';
+indicator.style.cssText = `
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: #10b981;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10000;
+  opacity: 0.8;
+`;
+indicator.textContent = 'SaveChat Loaded';
+document.body.appendChild(indicator);
+
+// Remove indicator after 3 seconds
+setTimeout(() => {
+  if (indicator.parentNode) {
+    indicator.parentNode.removeChild(indicator);
+  }
+}, 3000);
+
 // Manual trigger function for testing
 window.triggerSaveChat = () => {
+  console.log('SaveChat: Manual trigger called');
   if (window.saveChatInstance) {
+    console.log('SaveChat: Using existing instance');
     window.saveChatInstance.button.addSaveButtonsToAllResponses(
       window.saveChatInstance.detection, 
       window.saveChatInstance.storage
     );
   } else {
+    console.log('SaveChat: Creating new instance');
     window.saveChatInstance = new SaveChatContent();
+  }
+};
+
+// Debug function to check current state
+window.debugSaveChat = () => {
+  console.log('SaveChat: Debug info:');
+  console.log('- Instance exists:', !!window.saveChatInstance);
+  if (window.saveChatInstance) {
+    console.log('- Detection module:', window.saveChatInstance.detection);
+    console.log('- Button module:', window.saveChatInstance.button);
+    console.log('- Storage module:', window.saveChatInstance.storage);
+    
+    const responses = window.saveChatInstance.detection.findExistingResponses();
+    console.log('- Found responses:', responses.length);
+    responses.forEach((r, i) => {
+      console.log(`  Response ${i}:`, r);
+    });
   }
 }; 

@@ -7,6 +7,7 @@ class SaveChatDetection {
   }
 
   startObserver(callback) {
+    console.log('SaveChat: Starting mutation observer...');
     this.observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
@@ -18,11 +19,15 @@ class SaveChatDetection {
     });
 
     const chatContainer = this.findChatContainer();
+    console.log('SaveChat: Found chat container:', chatContainer);
     if (chatContainer) {
       this.observer.observe(chatContainer, {
         childList: true,
         subtree: true
       });
+      console.log('SaveChat: Observer started successfully');
+    } else {
+      console.log('SaveChat: No chat container found!');
     }
   }
 
@@ -45,8 +50,13 @@ class SaveChatDetection {
 
     for (const selector of selectors) {
       const container = document.querySelector(selector);
-      if (container) return container;
+      console.log(`SaveChat: Checking selector "${selector}":`, container);
+      if (container) {
+        console.log(`SaveChat: Using container:`, container);
+        return container;
+      }
     }
+    console.log('SaveChat: No container found, using document.body');
     return document.body;
   }
 
@@ -96,6 +106,8 @@ class SaveChatDetection {
   }
 
   findInsertTarget(responseElement) {
+    console.log('SaveChat: Finding insert target for:', responseElement);
+    
     const actionTraySelectors = [
       '[data-testid="message-actions"]',
       '[data-testid="message-actions-toolbar"]',
@@ -118,7 +130,9 @@ class SaveChatDetection {
 
     for (const selector of actionTraySelectors) {
       const actionTray = responseElement.querySelector(selector);
+      console.log(`SaveChat: Checking selector "${selector}":`, actionTray);
       if (actionTray && this.looksLikeActionTray(actionTray)) {
+        console.log('SaveChat: Found valid action tray:', actionTray);
         return actionTray;
       }
     }
@@ -172,7 +186,10 @@ class SaveChatDetection {
   }
 
   looksLikeActionTray(element) {
+    console.log('SaveChat: Checking if element looks like action tray:', element);
+    
     const hasButtons = element.querySelectorAll('button, [role="button"], [data-testid*="button"]').length > 0;
+    console.log('SaveChat: Has buttons:', hasButtons);
     
     const hasCopyButton = element.textContent.includes('Copy') || 
                          element.querySelector('[data-testid*="copy"]') ||
@@ -214,7 +231,21 @@ class SaveChatDetection {
     const isAtEnd = element === element.parentElement?.lastElementChild || 
                    element.nextElementSibling === null;
     
-    return hasButtons && (hasChatGPTButtons || (hasActionTrayClasses && hasSVGIcons)) && isAtEnd;
+    // More lenient check - if it has buttons and looks like an action area, consider it valid
+    const isActionTray = hasButtons && (hasChatGPTButtons || hasActionTrayClasses || hasSVGIcons);
+    
+    console.log('SaveChat: Action tray check results:', {
+      hasButtons,
+      hasChatGPTButtons,
+      hasActionTrayClasses,
+      hasSVGIcons,
+      isAtEnd,
+      isActionTray,
+      className: element.className,
+      textContent: element.textContent.substring(0, 100)
+    });
+    
+    return isActionTray;
   }
 
   isResponseReady(responseElement) {
@@ -222,15 +253,24 @@ class SaveChatDetection {
     const hasMarkdown = responseElement.querySelector('.markdown, .prose, .whitespace-pre-wrap');
     const hasStructure = responseElement.children.length > 0;
     
-    return hasTextContent && (hasMarkdown || hasStructure);
+    // More lenient check - if it has any content, consider it ready
+    const isReady = hasTextContent || hasMarkdown || hasStructure;
+    console.log('SaveChat: Response ready check:', { hasTextContent, hasMarkdown, hasStructure, isReady });
+    
+    return isReady;
   }
 
   async waitForActionTray(responseElement) {
-    const maxWaitTime = 10000;
-    const checkInterval = 200;
+    const maxWaitTime = 3000; // Reduced from 10000ms to 3000ms
+    const checkInterval = 100; // Reduced from 200ms to 100ms
     let elapsed = 0;
 
     while (elapsed < maxWaitTime) {
+      // Check if element is still in DOM
+      if (!responseElement.isConnected) {
+        return null;
+      }
+      
       const actionTray = this.findInsertTarget(responseElement);
       if (actionTray && this.looksLikeActionTray(actionTray)) {
         return actionTray;

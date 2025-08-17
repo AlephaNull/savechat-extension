@@ -11,16 +11,19 @@ class SaveChatButton {
     saveButton.className = 'savechat-button';
     saveButton.setAttribute('data-testid', 'savechat-save-button');
     saveButton.setAttribute('aria-label', 'Save response');
-    saveButton.style.cssText = `
+    
+    // Detect if we're in dark mode
+    const isDarkMode = document.documentElement.classList.contains('dark') || 
+                      document.body.classList.contains('dark') ||
+                      window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    const baseStyles = `
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
       padding: 6px 8px;
-      border: none;
       border-radius: 6px;
-      background: transparent;
-      color: #6b7280;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
@@ -30,8 +33,24 @@ class SaveChatButton {
       min-width: 32px;
       height: 32px;
       position: relative;
-      opacity: 0.8;
+      z-index: 1000;
     `;
+    
+    if (isDarkMode) {
+      saveButton.style.cssText = baseStyles + `
+        border: 1px solid #4b5563;
+        background: transparent;
+        color: #9ca3af;
+        opacity: 0.8;
+      `;
+    } else {
+      saveButton.style.cssText = baseStyles + `
+        border: 1px solid #e5e7eb;
+        background: transparent;
+        color: #6b7280;
+        opacity: 0.8;
+      `;
+    }
     
     const svgIcon = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
@@ -46,47 +65,97 @@ class SaveChatButton {
       <span style="font-size: 14px; font-weight: 500;">Save</span>
     `;
 
-    saveButton.addEventListener('mouseenter', () => {
-      saveButton.style.background = '#f3f4f6';
-      saveButton.style.color = '#374151';
-      saveButton.style.opacity = '1';
-    });
+    // Set up hover effects based on theme
+    if (isDarkMode) {
+      saveButton.addEventListener('mouseenter', () => {
+        saveButton.style.background = '#374151';
+        saveButton.style.color = '#f9fafb';
+        saveButton.style.borderColor = '#6b7280';
+        saveButton.style.opacity = '1';
+      });
 
-    saveButton.addEventListener('mouseleave', () => {
-      saveButton.style.background = 'transparent';
-      saveButton.style.color = '#6b7280';
-      saveButton.style.opacity = '0.8';
-    });
+      saveButton.addEventListener('mouseleave', () => {
+        saveButton.style.background = 'transparent';
+        saveButton.style.color = '#9ca3af';
+        saveButton.style.borderColor = '#4b5563';
+        saveButton.style.opacity = '0.8';
+      });
+    } else {
+      saveButton.addEventListener('mouseenter', () => {
+        saveButton.style.background = '#f3f4f6';
+        saveButton.style.color = '#374151';
+        saveButton.style.borderColor = '#d1d5db';
+        saveButton.style.opacity = '1';
+      });
+
+      saveButton.addEventListener('mouseleave', () => {
+        saveButton.style.background = 'transparent';
+        saveButton.style.color = '#6b7280';
+        saveButton.style.borderColor = '#e5e7eb';
+        saveButton.style.opacity = '0.8';
+      });
+    }
 
     return saveButton;
   }
 
   addSaveButtonToResponse(responseElement, detectionModule, storageModule) {
-    if (responseElement.querySelector('.savechat-button') || 
-        responseElement.closest('.savechat-button')) {
+    console.log('SaveChat: Attempting to add save button to:', responseElement);
+    
+    // Check if this specific response already has a save button
+    if (responseElement.querySelector('.savechat-button')) {
+      console.log('SaveChat: This response already has a save button, skipping');
       return;
     }
 
+    // Check if any parent element has a save button
     const parentWithButton = responseElement.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
-    if (parentWithButton && parentWithButton !== responseElement && 
-        parentWithButton.querySelector('.savechat-button')) {
+    if (parentWithButton && parentWithButton.querySelector('.savechat-button')) {
+      console.log('SaveChat: Parent already has save button, skipping');
       return;
     }
+
+    // Check if we're already processing this element
+    if (responseElement.dataset.savechatProcessing === 'true') {
+      console.log('SaveChat: Already processing this element, skipping');
+      return;
+    }
+
+    // Mark this element as being processed
+    responseElement.dataset.savechatProcessing = 'true';
 
     if (!detectionModule.isResponseReady(responseElement)) {
+      console.log('SaveChat: Response not ready, retrying in 200ms');
       setTimeout(() => {
+        // Remove processing flag before retry
+        delete responseElement.dataset.savechatProcessing;
         if (!responseElement.querySelector('.savechat-button') && 
             !responseElement.closest('.savechat-button')) {
           this.addSaveButtonToResponse(responseElement, detectionModule, storageModule);
         }
-      }, 500);
+      }, 200); // Reduced from 500ms to 200ms
       return;
     }
 
+    console.log('SaveChat: Response ready, waiting for action tray...');
     detectionModule.waitForActionTray(responseElement).then((actionTray) => {
+      console.log('SaveChat: Action tray found:', actionTray);
       if (actionTray && !actionTray.querySelector('.savechat-button')) {
+        console.log('SaveChat: Creating and inserting save button');
         this.createAndInsertSaveButton(actionTray, responseElement, storageModule);
+      } else if (!actionTray) {
+        console.log('SaveChat: No action tray found, creating one...');
+        const newActionTray = this.createActionTrayIfNeeded(responseElement);
+        responseElement.appendChild(newActionTray);
+        this.createAndInsertSaveButton(newActionTray, responseElement, storageModule);
+      } else {
+        console.log('SaveChat: Save button already exists');
       }
+      // Remove processing flag
+      delete responseElement.dataset.savechatProcessing;
+    }).catch(() => {
+      // Remove processing flag on error
+      delete responseElement.dataset.savechatProcessing;
     });
   }
 
@@ -105,6 +174,7 @@ class SaveChatButton {
   }
 
   createAndInsertSaveButton(actionTray, responseElement, storageModule) {
+    console.log('SaveChat: Creating and inserting save button into:', actionTray);
     const saveButton = this.createSaveButton(responseElement);
     
     saveButton.addEventListener('click', async (e) => {
@@ -114,10 +184,63 @@ class SaveChatButton {
     });
 
     actionTray.appendChild(saveButton);
+    console.log('SaveChat: Save button inserted successfully');
+  }
+
+  createActionTrayIfNeeded(responseElement) {
+    console.log('SaveChat: Creating action tray if needed for:', responseElement);
+    
+    // Check if there's already an action tray
+    const existingTray = responseElement.querySelector('[data-testid="message-actions"], .flex.items-center.gap-1, .flex.items-center.gap-2');
+    if (existingTray) {
+      console.log('SaveChat: Action tray already exists:', existingTray);
+      return existingTray;
+    }
+
+    // Create a new action tray
+    const actionTray = document.createElement('div');
+    actionTray.className = 'flex items-center gap-2 justify-end mt-2';
+    actionTray.setAttribute('data-testid', 'message-actions');
+    actionTray.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 8px;
+      padding: 4px 0;
+    `;
+
+    console.log('SaveChat: Created new action tray:', actionTray);
+    return actionTray;
+  }
+
+  updateButtonThemes() {
+    console.log('SaveChat: Updating button themes...');
+    const saveButtons = document.querySelectorAll('.savechat-button');
+    
+    // Detect current theme
+    const isDarkMode = document.documentElement.classList.contains('dark') || 
+                      document.body.classList.contains('dark') ||
+                      window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    saveButtons.forEach(button => {
+      if (isDarkMode) {
+        button.style.borderColor = '#4b5563';
+        button.style.background = 'transparent';
+        button.style.color = '#9ca3af';
+        button.style.opacity = '0.8';
+      } else {
+        button.style.borderColor = '#e5e7eb';
+        button.style.background = 'transparent';
+        button.style.color = '#6b7280';
+        button.style.opacity = '0.8';
+      }
+    });
   }
 
   cleanupDuplicateButtons() {
     const saveButtons = document.querySelectorAll('.savechat-button');
+    console.log(`SaveChat: Cleaning up ${saveButtons.length} save buttons`);
     
     saveButtons.forEach(button => {
       const responseElement = button.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
@@ -126,7 +249,10 @@ class SaveChatButton {
         const buttonsInResponse = responseElement.querySelectorAll('.savechat-button');
         
         if (buttonsInResponse.length > 1) {
+          console.log(`SaveChat: Found ${buttonsInResponse.length} buttons in response, keeping first one`);
+          // Keep the first button, remove the rest
           for (let i = 1; i < buttonsInResponse.length; i++) {
+            console.log('SaveChat: Removing duplicate button:', buttonsInResponse[i]);
             buttonsInResponse[i].remove();
           }
         }

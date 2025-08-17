@@ -135,17 +135,20 @@ class SaveChatStorage {
     const originalBackground = button.style.background;
     const originalColor = button.style.color;
     const originalBorderColor = button.style.borderColor;
+    const originalOpacity = button.style.opacity;
 
     button.innerHTML = '<span class="icon">✅</span> Saved!';
     button.style.background = '#10b981';
     button.style.color = 'white';
     button.style.borderColor = '#10b981';
+    button.style.opacity = '1';
 
     setTimeout(() => {
       button.innerHTML = originalHTML;
       button.style.background = originalBackground;
       button.style.color = originalColor;
       button.style.borderColor = originalBorderColor;
+      button.style.opacity = originalOpacity;
     }, 2000);
   }
 
@@ -153,15 +156,21 @@ class SaveChatStorage {
     const originalHTML = button.innerHTML;
     const originalBackground = button.style.background;
     const originalColor = button.style.color;
+    const originalBorderColor = button.style.borderColor;
+    const originalOpacity = button.style.opacity;
 
     button.innerHTML = '<span class="icon">❌</span> Error';
     button.style.background = '#ef4444';
     button.style.color = 'white';
+    button.style.borderColor = '#ef4444';
+    button.style.opacity = '1';
 
     setTimeout(() => {
       button.innerHTML = originalHTML;
       button.style.background = originalBackground;
       button.style.color = originalColor;
+      button.style.borderColor = originalBorderColor;
+      button.style.opacity = originalOpacity;
     }, 2000);
   }
 
@@ -177,10 +186,14 @@ class SaveChatStorage {
   }
 
   async getRecentSavedResponse() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get({ savedResponses: [] }, (data) => {
-        const responses = data.savedResponses || [];
-        resolve(responses.length > 0 ? responses[0] : null);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          const responses = data.savedResponses || [];
+          resolve(responses.length > 0 ? responses[0] : null);
+        }
       });
     });
   }
