@@ -62,13 +62,7 @@ class SaveChatDetection {
 
   isResponseNode(node) {
     const responseSelectors = [
-      'div[data-message-author-role="assistant"]',
-      '[data-message-author-role="assistant"]',
-      '.group.w-full.text-gray-800.dark\\:text-gray-100[data-message-author-role="assistant"]',
-      '.flex.flex-col.items-center.text-base[data-message-author-role="assistant"]',
-      '[data-message-author-role="assistant"] .markdown',
-      '[data-message-author-role="assistant"] .prose',
-      '[data-message-author-role="assistant"] .whitespace-pre-wrap'
+      '[data-message-author-role="assistant"]'
     ];
 
     return node.matches && responseSelectors.some(selector => node.matches(selector));
@@ -128,15 +122,21 @@ class SaveChatDetection {
       '.flex.items-center.gap-2'
     ];
 
-    for (const selector of actionTraySelectors) {
-      const actionTray = responseElement.querySelector(selector);
-      console.log(`SaveChat: Checking selector "${selector}":`, actionTray);
-      if (actionTray && this.looksLikeActionTray(actionTray)) {
-        console.log('SaveChat: Found valid action tray:', actionTray);
-        return actionTray;
-      }
+    // Prefer the bottom-most matching action tray inside this response
+    const candidateTrays = [];
+    actionTraySelectors.forEach(selector => {
+      const matches = Array.from(responseElement.querySelectorAll(selector));
+      matches.forEach(m => {
+        if (this.looksLikeActionTray(m)) {
+          candidateTrays.push(m);
+        }
+      });
+    });
+    if (candidateTrays.length > 0) {
+      return candidateTrays[candidateTrays.length - 1];
     }
 
+    // Fallback to previous, broader search up the tree
     const parentResponse = responseElement.closest('[data-message-author-role="assistant"], .group, .flex.flex-col');
     if (parentResponse) {
       for (const selector of actionTraySelectors) {
@@ -285,13 +285,8 @@ class SaveChatDetection {
 
   findExistingResponses() {
     const selectors = [
-      'div[data-message-author-role="assistant"]',
       '[data-message-author-role="assistant"]',
-      '.group.w-full.text-gray-800.dark\\:text-gray-100[data-message-author-role="assistant"]',
-      '.flex.flex-col.items-center.text-base[data-message-author-role="assistant"]',
-      '[data-message-author-role="assistant"] .markdown',
-      '[data-message-author-role="assistant"] .prose',
-      '[data-message-author-role="assistant"] .whitespace-pre-wrap'
+      'div[data-message-author-role="assistant"]'
     ];
 
     const responses = [];

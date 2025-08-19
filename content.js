@@ -76,34 +76,25 @@ class SaveChatContent {
   }
 
   checkForNewResponses(node) {
-    console.log('SaveChat: Checking for new responses in node:', node);
-    const responseSelectors = [
-      'div[data-message-author-role="assistant"]',
-      '[data-message-author-role="assistant"]',
-      '.group.w-full.text-gray-800.dark\\:text-gray-100[data-message-author-role="assistant"]',
-      '.flex.flex-col.items-center.text-base[data-message-author-role="assistant"]',
-      '[data-message-author-role="assistant"] .markdown',
-      '[data-message-author-role="assistant"] .prose',
-      '[data-message-author-role="assistant"] .whitespace-pre-wrap'
-    ];
+    const containers = [];
+    if (node && node.nodeType === Node.ELEMENT_NODE) {
+      if (node.matches && node.matches('[data-message-author-role="assistant"]')) {
+        containers.push(node);
+      }
+      if (node.querySelectorAll) {
+        containers.push(...node.querySelectorAll('[data-message-author-role="assistant"]'));
+      }
+    }
 
-    responseSelectors.forEach(selector => {
-      const responses = node.querySelectorAll(selector);
-      console.log(`SaveChat: Found ${responses.length} responses with selector: ${selector}`);
-      responses.forEach(response => {
-        if (this.detection.looksLikeAssistantResponse(response)) {
-          console.log('SaveChat: Adding save button to response:', response);
-          this.button.addSaveButtonToResponse(response, this.detection, this.storage);
-          
-          // Also try immediate addition for faster response
-          setTimeout(() => {
-            if (!response.querySelector('.savechat-button')) {
-              console.log('SaveChat: Immediate retry for response:', response);
-              this.button.addSaveButtonToResponse(response, this.detection, this.storage);
-            }
-          }, 100);
-        }
-      });
+    containers.forEach((response) => {
+      if (this.detection.looksLikeAssistantResponse(response)) {
+        this.button.addSaveButtonToResponse(response, this.detection, this.storage);
+        setTimeout(() => {
+          if (!response.querySelector('.savechat-button')) {
+            this.button.addSaveButtonToResponse(response, this.detection, this.storage);
+          }
+        }, 100);
+      }
     });
   }
 

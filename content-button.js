@@ -4,6 +4,7 @@
 class SaveChatButton {
   constructor() {
     this.savedResponses = new Set();
+    this.responseObservers = new WeakMap();
   }
 
   createSaveButton(responseElement) {
@@ -142,12 +143,12 @@ class SaveChatButton {
       console.log('SaveChat: Action tray found:', actionTray);
       if (actionTray && !actionTray.querySelector('.savechat-button')) {
         console.log('SaveChat: Creating and inserting save button');
-        this.createAndInsertSaveButton(actionTray, responseElement, storageModule);
+        this.createAndInsertSaveButton(actionTray, responseElement, storageModule, detectionModule);
       } else if (!actionTray) {
         console.log('SaveChat: No action tray found, creating one...');
         const newActionTray = this.createActionTrayIfNeeded(responseElement);
         responseElement.appendChild(newActionTray);
-        this.createAndInsertSaveButton(newActionTray, responseElement, storageModule);
+        this.createAndInsertSaveButton(newActionTray, responseElement, storageModule, detectionModule);
       } else {
         console.log('SaveChat: Save button already exists');
       }
@@ -163,18 +164,30 @@ class SaveChatButton {
     const existingActionTray = detectionModule.findInsertTarget(responseElement);
     if (existingActionTray && detectionModule.looksLikeActionTray(existingActionTray) && 
         !existingActionTray.querySelector('.savechat-button')) {
-      this.createAndInsertSaveButton(existingActionTray, responseElement, storageModule);
+      this.createAndInsertSaveButton(existingActionTray, responseElement, storageModule, detectionModule);
     } else {
       detectionModule.waitForActionTray(responseElement).then((actionTray) => {
         if (actionTray && !actionTray.querySelector('.savechat-button')) {
-          this.createAndInsertSaveButton(actionTray, responseElement, storageModule);
+          this.createAndInsertSaveButton(actionTray, responseElement, storageModule, detectionModule);
         }
       });
     }
   }
 
-  createAndInsertSaveButton(actionTray, responseElement, storageModule) {
+  createAndInsertSaveButton(actionTray, responseElement, storageModule, detectionModule) {
     console.log('SaveChat: Creating and inserting save button into:', actionTray);
+    let targetTray = actionTray;
+
+    // Ensure the tray we use is at the end of the response
+    const container = responseElement.closest('[data-message-author-role="assistant"]') || responseElement;
+    const isDirectChild = targetTray.parentElement === container;
+    const isLastChild = isDirectChild && targetTray === container.lastElementChild;
+    if (!isDirectChild || !isLastChild) {
+      // Create our own tray at the end to satisfy positioning requirement
+      targetTray = this.createActionTrayIfNeeded(container);
+      if (!targetTray.isConnected) container.appendChild(targetTray);
+    }
+
     const saveButton = this.createSaveButton(responseElement);
     
     saveButton.addEventListener('click', async (e) => {
@@ -183,8 +196,11 @@ class SaveChatButton {
       await storageModule.saveResponse(responseElement, saveButton);
     });
 
-    actionTray.appendChild(saveButton);
+    targetTray.appendChild(saveButton);
     console.log('SaveChat: Save button inserted successfully');
+
+    // Keep the button persistent even if ChatGPT re-renders this message
+    this.setupPersistenceObserver(responseElement, detectionModule, storageModule);
   }
 
   createActionTrayIfNeeded(responseElement) {
@@ -197,9 +213,9 @@ class SaveChatButton {
       return existingTray;
     }
 
-    // Create a new action tray
+    // Create a new action tray as the last child of the response
     const actionTray = document.createElement('div');
-    actionTray.className = 'flex items-center gap-2 justify-end mt-2';
+    actionTray.className = 'flex items-center gap-2 justify-end mt-2 savechat-button-container';
     actionTray.setAttribute('data-testid', 'message-actions');
     actionTray.style.cssText = `
       display: flex;
@@ -212,6 +228,41 @@ class SaveChatButton {
 
     console.log('SaveChat: Created new action tray:', actionTray);
     return actionTray;
+  }
+
+  setupPersistenceObserver(responseElement, detectionModule, storageModule) {
+    if (this.responseObservers.has(responseElement)) return;
+
+    const ensureAtEnd = () => {
+      const tray = responseElement.querySelector('.savechat-button')?.parentElement;
+      if (tray && tray.parentElement === responseElement && tray !== responseElement.lastElementChild) {
+        responseElement.appendChild(tray);
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      if (!responseElement.isConnected) {
+        observer.disconnect();
+        this.responseObservers.delete(responseElement);
+        return;
+      }
+      let tray = detectionModule.findInsertTarget(responseElement);
+      if (!tray || !detectionModule.looksLikeActionTray(tray)) {
+        tray = this.createActionTrayIfNeeded(responseElement);
+        if (!tray.isConnected) responseElement.appendChild(tray);
+      }
+      const hasButton = !!tray.querySelector('.savechat-button');
+      if (!hasButton) {
+        this.createAndInsertSaveButton(tray, responseElement, storageModule, detectionModule);
+      }
+      ensureAtEnd();
+    });
+
+    observer.observe(responseElement, { childList: true, subtree: true });
+    this.responseObservers.set(responseElement, observer);
+
+    // Initial position correction
+    ensureAtEnd();
   }
 
   updateButtonThemes() {
